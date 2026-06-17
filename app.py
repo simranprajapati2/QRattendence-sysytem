@@ -56,6 +56,104 @@ def login():
         return "Invalid Credentials"
 
     return render_template('login.html')
+ # ---------------- QR EXPIRY ----------------
+    qr_data = data.get('data').strip()
+
+    try:
+        roll_no, expiry_time = qr_data.split("|")
+
+        expiry_time = datetime.strptime(
+            expiry_time,
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+        if datetime.now() > expiry_time:
+
+            conn.close()
+
+            return jsonify({
+                "status": "expired",
+                "message": "QR Code Expired"
+            })
+
+    except:
+        roll_no = qr_data
+
+    # Get student name
+    cursor.execute(
+    "SELECT name FROM students WHERE roll_no=%s",
+    (roll_no,)
+    )
+
+    student = cursor.fetchone()
+
+    if not student:
+        conn.close()
+        return jsonify({
+            "status": "error",
+            "message": "Student not found"
+        })
+
+    name = student[0]
+    # ---------------- TIME LIMIT ----------------
+    cursor.execute("""
+        SELECT start_time, end_time
+        FROM attendance_settings
+        WHERE id=1
+    """)
+
+    timing = cursor.fetchone()
+    now = datetime.now()
+
+    start_time = (datetime.min + timing[0]).time()
+    end_time = (datetime.min + timing[1]).time()
+    if not (start_time <= now.time() <= end_time):
+
+        conn.close()
+
+        return jsonify({
+            "status": "closed",
+            "message": "Attendance Closed"
+        })
+
+    today = now.date()
+    current_time = now.strftime("%H:%M:%S")
+
+    # Duplicate check
+    cursor.execute("""
+        SELECT * FROM attendance_new
+        WHERE roll_no=%s AND date=%s
+    """, (roll_no, today))
+
+    exists = cursor.fetchone()
+
+    if exists:
+
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "name": name
+        })
+
+    # Insert attendance
+    cursor.execute(
+        """
+        INSERT INTO attendance_new
+        (roll_no, date, time)
+        VALUES (%s, %s, %s)
+        """,
+        (roll_no, today, current_time)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "status": "success",
+        "name": name
+    })
+
 
 
 # ---------------- DASHBOARD ----------------
@@ -375,6 +473,44 @@ def attendance_control():
     conn.close()
 
     return render_template("attendance_control.html", timing=timing)
+
+# ---------------- ATTENDANCE CONTROL ----------------
+@app.route('/attendance_control', methods=['GET', 'POST'])
+def attendance_control():
+
+    if not is_logged_in():
+        return redirect('/login')
+
+    conn, cursor = get_db()
+
+    if request.method == 'POST':
+
+        start_time = request.form['start_time']
+        end_time = request.form['end_time']
+
+        cursor.execute("""
+            UPDATE attendance_settings
+            SET start_time=%s,
+                end_time=%s
+            WHERE id=1
+        """, (start_time, end_time))
+
+        conn.commit()
+
+    cursor.execute("""
+        SELECT start_time, end_time
+        FROM attendance_settings
+        WHERE id=1
+    """)
+
+    timing = cursor.fetchone()
+
+    conn.close()
+
+    return render_template(
+        'attendance_control.html',
+        timing=timing
+    )
 
 
 # ---------------- LOGOUT ----------------
