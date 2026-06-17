@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background-color: #f5f7fa;
+        }
+
+        .card {
+            border-radius: 15px;
+        }
+
+        .card h2 {
+            font-weight: bold;
+        }
+
+        .navbar {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- 🔷 NAVBAR -->
+<nav class="navbar navbar-dark bg-dark px-3">
+
+    <span class="navbar-brand">QR Attendance System</span>
+
+    <div style="display:flex; gap:10px; align-items:center;">
+
+        <!-- Admin Dropdown -->
+        <div class="dropdown">
+            <button class="btn btn-light btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                Admin Panel
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="/add_student">Add Student</a></li>
+                <li><a class="dropdown-item" href="/generate">Generate QR</a></li>
+            </ul>
+        </div>
+
+        <a href="/scan_page" class="btn btn-success btn-sm">Scan QR</a>
+        <a href="/report" class="btn btn-info btn-sm">Reports</a>
+        <a href="/leaderboard" class="btn btn-warning">🏆 Leaderboard</a>
+        <a href="/ranking" class="btn btn-primary btn-sm">Leaderboard</a>
+        <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
+
+    </div>
+
+</nav>
+
+<!-- 🔷 DASHBOARD -->
+<div class="container mt-4">
+
+    <div class="row g-3">
+
+        <!-- Total Students -->
+        <div class="col-md-3">
+            <div class="card text-white bg-primary shadow text-center p-3">
+                <h5>Total Students</h5>
+                <h2>{{ total_students }}</h2>
+            </div>
+        </div>
+
+        <!-- Present Today -->
+        <div class="col-md-3">
+            <div class="card text-white bg-success shadow text-center p-3">
+                <h5>Present Today</h5>
+                <h2>{{ present_today }}</h2>
+            </div>
+        </div>
+
+        <!-- Absent Today -->
+        <div class="col-md-3">
+            <div class="card text-white bg-danger shadow text-center p-3">
+                <h5>Absent Today</h5>
+                <h2>{{ total_students - present_today }}</h2>
+            </div>
+        </div>
+
+        <!-- Attendance % -->
+        <div class="col-md-3">
+            <div class="card text-white bg-dark shadow text-center p-3">
+                <h5>Attendance %</h5>
+                <h2>
+                    {% if total_students > 0 %}
+                        {{ (present_today / total_students * 100) | round(2) }}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </h2>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 🔷 GRAPH -->
+    <div class="mt-5">
+        <h4 class="mb-3">Monthly Attendance Graph</h4>
+
+        <div class="card p-3 shadow">
+            <canvas id="attendanceChart"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<!-- 🔥 GRAPH SCRIPT (FIXED) -->
+<script>
+    const rawLabels = {{ dates | tojson }};
+    const rawData = {{ counts | tojson }};
+
+    // Remove duplicate labels
+    const labels = [...new Set(rawLabels)];
+    const data = rawData.slice(0, labels.length);
+
+    const ctx = document.getElementById('attendanceChart').getContext('2d');
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Present Students',
+                data: data,
+                borderWidth: 2,
+                tension: 0.3,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

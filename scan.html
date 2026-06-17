@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>QR Scan Attendance</title>
+
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: #f4f6f9;
+            font-family: Arial;
+        }
+
+        .container-box {
+            max-width: 500px;
+            margin: 40px auto;
+            text-align: center;
+        }
+
+        #reader {
+            width: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .card {
+            padding: 20px;
+            border-radius: 15px;
+        }
+
+        .popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .title {
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        input {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container container-box">
+
+    <div class="card shadow">
+
+        <h3 class="title">📷 QR Attendance Scanner</h3>
+
+        <!-- CAMERA SCANNER -->
+        <div id="reader"></div>
+
+        <h5 class="mt-3">OR</h5>
+
+        <!-- FILE UPLOAD -->
+        <input type="file" id="qrImage" class="form-control" accept="image/*">
+
+    </div>
+
+</div>
+
+<!-- POPUP -->
+<div id="popup" class="popup"></div>
+
+<script>
+
+let scanned = false;
+
+function showPopup(msg, color) {
+    let popup = document.getElementById("popup");
+    popup.innerText = msg;
+    popup.style.background = color;
+    popup.style.display = "block";
+
+    setTimeout(() => {
+        popup.style.display = "none";
+        scanned = false;
+    }, 2000);
+}
+
+// 📷 CAMERA SCAN
+function onScanSuccess(decodedText) {
+
+    if (scanned) return;
+    scanned = true;
+
+    sendToServer(decodedText);
+}
+
+// 📁 IMAGE SCAN
+document.getElementById("qrImage").addEventListener("change", function(e) {
+
+    let file = e.target.files[0];
+    if (!file) return;
+
+    let html5QrCode = new Html5Qrcode("reader");
+
+    html5QrCode.scanFile(file, true)
+    .then(decodedText => {
+        sendToServer(decodedText);
+    })
+    .catch(err => {
+        showPopup("❌ Invalid QR Code", "red");
+    });
+});
+
+// 🔁 SEND TO FLASK
+function sendToServer(decodedText) {
+
+    fetch("/scan", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ data: decodedText })
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        if (data.status === "success") {
+            showPopup("✅ " + data.name + " Marked Present", "green");
+        }
+        else if (data.status === "expired") {
+            showPopup("⛔ QR Expired", "orange");
+        }
+        else {
+            showPopup("❌ " + data.message, "red");
+        }
+    })
+    .catch(() => {
+        showPopup("❌ Server Error", "gray");
+    });
+}
+
+// 📷 START CAMERA
+const scanner = new Html5QrcodeScanner("reader", {
+    fps: 10,
+    qrbox: 250
+});
+
+scanner.render(onScanSuccess);
+
+</script>
+
+</body>
+</html>
